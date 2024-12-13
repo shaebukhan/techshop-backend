@@ -198,6 +198,70 @@ const getAllCategoryProductsController = async (req, res) => {
         res.status(500).json({ success: false, message: 'Error retrieving products', error });
     }
 };
+//sub categories 
+
+const getAllSubCategoriesController = async (req, res) => {
+    try {
+        const { categoryName } = req.params;
+
+        if (!categoryName) {
+            return res.status(400).json({ success: false, message: 'Category is required' });
+        }
+
+        // Aggregate to find unique subcategories for the given categoryName
+        const uniqueSubCategories = await ProductModel.aggregate([
+            { $match: { categoryName } }, // Filter by categoryName
+            { $group: { _id: "$subcategory" } }, // Group by subcategory field to get unique values
+            { $sort: { _id: 1 } } // Optional: Sort alphabetically
+        ]);
+
+        // Map the result to return only the subcategory names
+        const subCategories = uniqueSubCategories.map(item => item._id);
+
+        res.status(200).json({
+            success: true,
+            subCategories,
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Error retrieving subcategories', error });
+    }
+};
+
+//getsubcategoriesproducts 
+
+const getSubCategoryProductsController = async (req, res) => {
+    try {
+        const { subcategory } = req.params;
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 20;
+
+        if (!subcategory) {
+            return res.status(400).json({ success: false, message: 'Sub Category is required' });
+        }
+
+        // Define the filter based on the categoryName
+        const filter = { subcategory };  // Assuming 'categoryName' is the correct field in your Product model
+
+        // Count total products for pagination
+        const totalProducts = await ProductModel.countDocuments(filter);
+
+        // Fetch products with pagination
+        const subcategoryproducts = await ProductModel.find(filter)
+            .skip((page - 1) * limit) // Skip items for previous pages
+            .limit(limit); // Limit the results to the specified amount per page
+
+        res.status(200).json({
+            success: true,
+            totalProducts,
+            currentPage: page,
+            totalPages: Math.ceil(totalProducts / limit),
+            subcategoryproducts,
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Error retrieving products', error });
+    }
+};
+
 //search product
 const SearchProductController = async (req, res) => {
     try {
@@ -340,6 +404,8 @@ const updateProductController = async (req, res) => {
     }
 };
 
+
+
 const deleteProductController = async (req, res) => {
     try {
 
@@ -366,4 +432,4 @@ const deleteProductController = async (req, res) => {
 };
 
 
-module.exports = { addProductsController, getAllProductsController, getSingleProductController, updateProductController, deleteProductController, getAllRelatedProductsController, getAllCategoryProductsController, getAllUniqueCategoriesController, SearchProductController, getTotalProductsController };
+module.exports = { addProductsController, getAllProductsController, getSingleProductController, updateProductController, deleteProductController, getAllRelatedProductsController, getAllCategoryProductsController, getAllUniqueCategoriesController, SearchProductController, getTotalProductsController, getAllSubCategoriesController, getSubCategoryProductsController };

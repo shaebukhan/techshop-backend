@@ -1,5 +1,55 @@
 const OrderModel = require('../models/OrdersModel'); // Import the Order model
 const ProductModel = require("../models/ProductModel");
+const { Client, Environment } = require('square');
+
+// Initialize the Square Client
+const client = new Client({
+    environment: Environment.Sandbox, // Change to 'Environment.Production' for live
+    accessToken: 'EAAAl9_6G0uBc5CadksCL82BxbTUGSs38Daxg_qr3VlpeRLhdMhf9eChdY2NqdI9', // Replace with your actual access token
+});
+
+const processPaymentController = async (req, res) => {
+    const { sourceId, amount } = req.body;
+
+    if (!sourceId || !amount) {
+        return res.status(200).json({
+            success: false,
+            error: 'Invalid request. Please provide a valid sourceId and amount.',
+        });
+    }
+
+    try {
+        const paymentsApi = client.paymentsApi;
+
+        // Create a unique idempotency key
+        const idempotencyKey = `${Date.now()}-${Math.random().toString(36).substring(7)}`;
+
+        // Attempt to create the payment
+        const response = await paymentsApi.createPayment({
+            sourceId,
+            amountMoney: {
+                amount: Math.round(amount * 100), // Convert to cents and ensure it's an integer
+                currency: 'USD',
+            },
+            idempotencyKey,
+        });
+
+        return res.status(200).json({
+            success: true,
+            payment: response.result,
+        });
+    } catch (error) {
+        // Extract detailed error information from the Square API response
+        const errorDetails = error?.response?.errors || [{ detail: error.message }];
+        return res.status(500).json({
+            success: false,
+            error: 'Payment processing failed.',
+            details: errorDetails,
+        });
+    }
+};
+
+
 // Create a new order
 const createOrder = async (req, res) => {
     try {
@@ -114,5 +164,5 @@ const getAllOrders = async (req, res) => {
 module.exports = {
     createOrder,
     getAllOrders,
-    getOrderById
+    getOrderById, processPaymentController
 };
